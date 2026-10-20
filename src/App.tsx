@@ -1157,102 +1157,144 @@ export default function App() {
 
   if (recoveryMode) {
     return (
-      <main style={{ ...styles.app, display: 'grid', placeItems: 'center', padding: 20 }}>
-        <form onSubmit={updatePassword} style={{ ...styles.card, width: '100%', maxWidth: 400 }}>
-          <h1>Nova senha</h1>
-          <p style={styles.muted}>Digite sua nova senha para continuar.</p>
-          <input
-            style={styles.input}
-            type="password"
-            minLength={8}
-            required
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="Nova senha (mínimo 8 caracteres)"
-          />
-          <button style={{ ...styles.button, width: '100%', marginTop: 12 }} type="submit">
-            Atualizar senha
-          </button>
-          {message && <p>{message}</p>}
-          {error && <p style={{ color: '#fca5a5' }}>{error}</p>}
-        </form>
+      <main className="auth-screen">
+        <style>{`
+        .auth-screen{min-height:100vh;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(360px,.95fr);background:#0b1020;color:#f8fafc;font-family:Inter,ui-sans-serif,system-ui,sans-serif}
+        .auth-art{position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;gap:32px;padding:clamp(28px,5vw,72px);background:radial-gradient(ellipse at 20% 15%,rgba(99,102,241,.24),transparent 42%),radial-gradient(ellipse at 80% 85%,rgba(14,165,233,.14),transparent 38%),linear-gradient(145deg,#111a30 0%,#0b1020 72%);border-right:1px solid #29344b}
+        .auth-art:before{content:"";position:absolute;width:420px;height:420px;border:1px solid rgba(129,140,248,.15);border-radius:50%;right:-170px;top:18%;box-shadow:0 0 0 45px rgba(129,140,248,.025),0 0 0 90px rgba(129,140,248,.02)}
+        .auth-art>*{position:relative;z-index:1}
+        .auth-logo{display:flex;align-items:center;gap:12px;font-size:20px;font-weight:900;letter-spacing:1.8px}
+        .auth-logo-mark{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#6366f1,#0ea5e9);box-shadow:0 10px 30px #4f46e533}
+        .auth-eyebrow{font-size:11px;letter-spacing:2.2px;font-weight:800;color:#a5b4fc;margin:0 0 18px}
+        .auth-art h1{font-size:clamp(36px,4vw,60px);line-height:1.08;letter-spacing:-1.8px;margin:0;max-width:620px}
+        .auth-description{color:#a5b4cc;font-size:16px;line-height:1.8;max-width:510px;margin-top:22px}
+        .auth-stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
+        .auth-stat{display:flex;align-items:center;gap:9px;border:1px solid #34425d;background:#151d31aa;border-radius:12px;padding:12px 14px;color:#dbeafe;font-size:12px}
+        .auth-foot{color:#65758f;font-size:10px;letter-spacing:1.5px}
+        .auth-form-side{display:flex;align-items:center;justify-content:center;padding:clamp(24px,5vw,64px);background:linear-gradient(160deg,#0d1425,#0b1020)}
+        .auth-form{width:100%;max-width:430px}
+        .auth-mobile-logo{display:none;margin-bottom:30px}
+        .auth-form h2{font-size:30px;letter-spacing:-.8px;margin:0 0 10px}
+        .auth-muted{color:#91a0ba;line-height:1.7;font-size:14px;margin:0 0 28px}
+        .auth-field{display:block;color:#dbe4f4;font-size:13px;font-weight:650;margin-bottom:18px}
+        .auth-field input{display:block;box-sizing:border-box;width:100%;margin-top:9px;padding:14px 15px;border:1px solid #34425d;border-radius:11px;background:#0a1120;color:#f8fafc;font:inherit;outline:none;transition:border .2s,box-shadow .2s}
+        .auth-field input:focus{border-color:#818cf8;box-shadow:0 0 0 3px #818cf826}
+        .auth-primary{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;border:1px solid #6366f1;border-radius:11px;padding:14px 16px;background:linear-gradient(100deg,#4f46e5,#6366f1);color:white;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 12px 30px #4f46e526}
+        .auth-secondary{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;border:1px solid #34425d;border-radius:11px;padding:12px 16px;margin-top:9px;background:#151d31;color:#c7d2fe;font-size:13px;cursor:pointer}
+        .auth-alert{border:1px solid;border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.5;margin-bottom:18px;overflow-wrap:anywhere}
+        .auth-error{border-color:#7f1d1d;background:#450a0a55;color:#fca5a5}
+        .auth-success{border-color:#166534;background:#052e1655;color:#86efac}
+        .auth-public{display:inline-flex;align-items:center;gap:7px;margin-top:22px;color:#93c5fd;font-size:12px;text-decoration:none}
+        @media(max-width:820px){.auth-screen{grid-template-columns:1fr}.auth-art{display:none}.auth-form-side{min-height:100vh;padding:28px 22px}.auth-mobile-logo{display:flex}.auth-form h2{font-size:27px}}
+`}</style>
+        <section className="auth-art">
+          <div className="auth-logo"><span className="auth-logo-mark"><Shield size={25} /></span><span>SIMONU</span></div>
+          <div>
+            <p className="auth-eyebrow">RECUPERAÇÃO DE ACESSO</p>
+            <h1>Uma nova senha. O debate continua.</h1>
+            <p className="auth-description">Crie uma nova senha para voltar ao centro de comando da Mesa Diretora e continuar acompanhando a simulação.</p>
+          </div>
+          <small className="auth-foot">SIMONU · SIMULAÇÃO ACADÊMICA FICTÍCIA</small>
+        </section>
+        <section className="auth-form-side">
+          <form className="auth-form" onSubmit={updatePassword}>
+            <div className="auth-logo auth-mobile-logo"><span className="auth-logo-mark"><Shield size={23} /></span><span>SIMONU</span></div>
+            <p className="auth-eyebrow">SEGURANÇA DA CONTA</p>
+            <h2>Definir nova senha</h2>
+            <p className="auth-muted">Digite sua nova senha para continuar.</p>
+            {error && <div className="auth-alert auth-error">{error}</div>}
+            {message && <div className="auth-alert auth-success">{message}</div>}
+            <label className="auth-field">Nova senha
+              <input type="password" autoComplete="new-password" minLength={8} required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nova senha (mínimo 8 caracteres)" />
+            </label>
+            <button className="auth-primary" type="submit"><CheckCircle2 size={17} /> Atualizar senha</button>
+          </form>
+        </section>
       </main>
     );
   }
 
   if (!user) {
     return (
-      <main style={{ ...styles.app, display: 'grid', placeItems: 'center', padding: 20 }}>
-        <div style={{ ...styles.card, width: '100%', maxWidth: 430 }}>
-          <div style={{ color: '#a5b4cc', letterSpacing: 2, fontSize: 12 }}>SIMONU</div>
-          <h1>{resetEmail ? 'Recuperar senha' : 'Mesa Diretora'}</h1>
-
-          {resetEmail ? (
-            <form onSubmit={requestPasswordReset}>
-              <p style={styles.muted}>Enviaremos um link para o e-mail informado.</p>
-              <input
-                style={styles.input}
-                type="email"
-                required
-                value={resetEmail}
-                onChange={(e) => setResetEmail(e.target.value)}
-                placeholder="Seu e-mail"
-              />
-              <button style={{ ...styles.button, width: '100%', marginTop: 12 }}>
-                Enviar link
-              </button>
-              <button
-                type="button"
-                style={{ ...styles.button, width: '100%', marginTop: 8 }}
-                onClick={() => setResetEmail('')}
-              >
-                Voltar ao login
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={signIn}>
-              <p style={styles.muted}>Entre para avaliar e administrar a simulação.</p>
-              <label style={{ display: 'block', marginBottom: 12 }}>
-                E-mail
-                <input
-                  style={{ ...styles.input, marginTop: 6 }}
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="mesa@exemplo.com"
-                />
-              </label>
-              <label style={{ display: 'block' }}>
-                Senha
-                <input
-                  style={{ ...styles.input, marginTop: 6 }}
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Sua senha"
-                />
-              </label>
-              <button style={{ ...styles.button, width: '100%', marginTop: 16 }}>
-                Entrar
-              </button>
-              <button
-                type="button"
-                style={{ ...styles.button, width: '100%', marginTop: 8 }}
-                onClick={() => setResetEmail(email)}
-              >
-                Esqueci minha senha
-              </button>
-            </form>
-          )}
-
-          {message && <p style={{ color: '#86efac' }}>{message}</p>}
-          {error && <p style={{ color: '#fca5a5' }}>{error}</p>}
-          <a href="/publico" style={{ color: '#93c5fd', display: 'inline-block', marginTop: 18 }}>
-            <Eye size={15} style={{ verticalAlign: 'middle' }} /> Abrir painel público
-          </a>
-        </div>
+      <main className="auth-screen">
+        <style>{`
+        .auth-screen{min-height:100vh;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(360px,.95fr);background:#0b1020;color:#f8fafc;font-family:Inter,ui-sans-serif,system-ui,sans-serif}
+        .auth-art{position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;gap:32px;padding:clamp(28px,5vw,72px);background:radial-gradient(ellipse at 20% 15%,rgba(99,102,241,.24),transparent 42%),radial-gradient(ellipse at 80% 85%,rgba(14,165,233,.14),transparent 38%),linear-gradient(145deg,#111a30 0%,#0b1020 72%);border-right:1px solid #29344b}
+        .auth-art:before{content:"";position:absolute;width:420px;height:420px;border:1px solid rgba(129,140,248,.15);border-radius:50%;right:-170px;top:18%;box-shadow:0 0 0 45px rgba(129,140,248,.025),0 0 0 90px rgba(129,140,248,.02)}
+        .auth-art>*{position:relative;z-index:1}
+        .auth-logo{display:flex;align-items:center;gap:12px;font-size:20px;font-weight:900;letter-spacing:1.8px}
+        .auth-logo-mark{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#6366f1,#0ea5e9);box-shadow:0 10px 30px #4f46e533}
+        .auth-eyebrow{font-size:11px;letter-spacing:2.2px;font-weight:800;color:#a5b4fc;margin:0 0 18px}
+        .auth-art h1{font-size:clamp(36px,4vw,60px);line-height:1.08;letter-spacing:-1.8px;margin:0;max-width:620px}
+        .auth-description{color:#a5b4cc;font-size:16px;line-height:1.8;max-width:510px;margin-top:22px}
+        .auth-stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
+        .auth-stat{display:flex;align-items:center;gap:9px;border:1px solid #34425d;background:#151d31aa;border-radius:12px;padding:12px 14px;color:#dbeafe;font-size:12px}
+        .auth-foot{color:#65758f;font-size:10px;letter-spacing:1.5px}
+        .auth-form-side{display:flex;align-items:center;justify-content:center;padding:clamp(24px,5vw,64px);background:linear-gradient(160deg,#0d1425,#0b1020)}
+        .auth-form{width:100%;max-width:430px}
+        .auth-mobile-logo{display:none;margin-bottom:30px}
+        .auth-form h2{font-size:30px;letter-spacing:-.8px;margin:0 0 10px}
+        .auth-muted{color:#91a0ba;line-height:1.7;font-size:14px;margin:0 0 28px}
+        .auth-field{display:block;color:#dbe4f4;font-size:13px;font-weight:650;margin-bottom:18px}
+        .auth-field input{display:block;box-sizing:border-box;width:100%;margin-top:9px;padding:14px 15px;border:1px solid #34425d;border-radius:11px;background:#0a1120;color:#f8fafc;font:inherit;outline:none;transition:border .2s,box-shadow .2s}
+        .auth-field input:focus{border-color:#818cf8;box-shadow:0 0 0 3px #818cf826}
+        .auth-primary{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;border:1px solid #6366f1;border-radius:11px;padding:14px 16px;background:linear-gradient(100deg,#4f46e5,#6366f1);color:white;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 12px 30px #4f46e526}
+        .auth-secondary{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;border:1px solid #34425d;border-radius:11px;padding:12px 16px;margin-top:9px;background:#151d31;color:#c7d2fe;font-size:13px;cursor:pointer}
+        .auth-alert{border:1px solid;border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.5;margin-bottom:18px;overflow-wrap:anywhere}
+        .auth-error{border-color:#7f1d1d;background:#450a0a55;color:#fca5a5}
+        .auth-success{border-color:#166534;background:#052e1655;color:#86efac}
+        .auth-public{display:inline-flex;align-items:center;gap:7px;margin-top:22px;color:#93c5fd;font-size:12px;text-decoration:none}
+        @media(max-width:820px){.auth-screen{grid-template-columns:1fr}.auth-art{display:none}.auth-form-side{min-height:100vh;padding:28px 22px}.auth-mobile-logo{display:flex}.auth-form h2{font-size:27px}}
+`}</style>
+        <section className="auth-art">
+          <div className="auth-logo"><span className="auth-logo-mark"><Shield size={25} /></span><span>SIMONU</span></div>
+          <div>
+            <p className="auth-eyebrow">TEATRO DE OPERAÇÕES · 2027</p>
+            <h1>Centro de comando da Mesa Diretora.</h1>
+            <p className="auth-description">Registre avaliações, acompanhe os rankings e mantenha o histórico do debate em um único lugar.</p>
+            <div className="auth-stats">
+              <div className="auth-stat"><Users size={17} /> 20 representações</div>
+              <div className="auth-stat"><Activity size={17} /> 5 sessões · 20 checkpoints</div>
+            </div>
+          </div>
+          <small className="auth-foot">SIMONU · SIMULAÇÃO ACADÊMICA FICTÍCIA</small>
+        </section>
+        <section className="auth-form-side">
+          <div className="auth-form">
+            <div className="auth-logo auth-mobile-logo"><span className="auth-logo-mark"><Shield size={23} /></span><span>SIMONU</span></div>
+            {resetEmail ? (
+              <form onSubmit={requestPasswordReset}>
+                <p className="auth-eyebrow">RECUPERAÇÃO DE ACESSO</p>
+                <h2>Recupere sua senha</h2>
+                <p className="auth-muted">Informe o e-mail da sua conta. Você receberá um link para redefinir sua senha, se o endereço estiver cadastrado.</p>
+                {error && <div className="auth-alert auth-error">{error}</div>}
+                {message && <div className="auth-alert auth-success">{message}</div>}
+                <label className="auth-field">E-mail
+                  <input type="email" autoComplete="email" required value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} placeholder="voce@exemplo.com" />
+                </label>
+                <button className="auth-primary" type="submit"><RefreshCw size={16} /> Enviar link de recuperação</button>
+                <button className="auth-secondary" type="button" onClick={() => { setResetEmail(''); setError(''); setMessage(''); }}>Voltar ao login</button>
+              </form>
+            ) : (
+              <form onSubmit={signIn}>
+                <p className="auth-eyebrow">ACESSO RESTRITO</p>
+                <h2>Entrar na plataforma</h2>
+                <p className="auth-muted">Use o e-mail e a senha de um usuário autorizado para acessar o centro de comando.</p>
+                {error && <div className="auth-alert auth-error">{error}</div>}
+                {message && <div className="auth-alert auth-success">{message}</div>}
+                <label className="auth-field">E-mail
+                  <input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="mesa@exemplo.com" />
+                </label>
+                <label className="auth-field">Senha
+                  <input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Sua senha" />
+                </label>
+                <button className="auth-primary" type="submit"><Shield size={17} /> Entrar na plataforma</button>
+                <button className="auth-secondary" type="button" onClick={() => { setResetEmail(email); setError(''); setMessage(''); }}>Esqueci minha senha</button>
+              </form>
+            )}
+            <a className="auth-public" href="/publico"><Eye size={15} /> Abrir painel público ao vivo</a>
+          </div>
+        </section>
       </main>
     );
   }
