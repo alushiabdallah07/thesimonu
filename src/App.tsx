@@ -163,12 +163,27 @@ function scoreOf(evaluation: Evaluation, criteria: Criterion[]) {
   return average(values);
 }
 
+function isPublicPath() {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname.replace(/\/+$/, '');
+  const hash = window.location.hash.toLowerCase();
+  const search = window.location.search.toLowerCase();
+  return (
+    path === '/publico' ||
+    path.endsWith('/publico') ||
+    hash === '#/publico' ||
+    hash.includes('publico') ||
+    search.includes('publico')
+  );
+}
+
 function getDelegateStats(
   delegates: Delegate[],
   evaluations: Evaluation[],
   criteria: Criterion[],
   sessionId?: number,
   moment?: number,
+  includeUnscored = false,
 ) {
   return delegates
     .map((delegate) => {
@@ -181,7 +196,13 @@ function getDelegateStats(
 
       const allScores = matching.flatMap((e) =>
         criteria
-          .filter((c) => e.scores[c.id] !== undefined)
+          .filter(
+            (c) =>
+              e.scores &&
+              e.scores[c.id] !== undefined &&
+              e.scores[c.id] !== null &&
+              !isNaN(Number(e.scores[c.id])),
+          )
           .map((c) => Number(e.scores[c.id])),
       );
 
@@ -191,16 +212,22 @@ function getDelegateStats(
         average: avg,
         evaluationsCount: matching.length,
         scoresCount: allScores.length,
+        hasScores: allScores.length > 0,
       };
     })
-    .filter((d) => d.scoresCount > 0)
-    .sort((a, b) => b.average - a.average || a.name.localeCompare(b.name));
+    .filter((d) => (includeUnscored ? true : d.scoresCount > 0))
+    .sort((a, b) => {
+      if (a.hasScores && !b.hasScores) return -1;
+      if (!a.hasScores && b.hasScores) return 1;
+      return b.average - a.average || a.name.localeCompare(b.name);
+    });
 }
 
-function rankBadge(index: number) {
-  if (index === 0) return '🥇';
-  if (index === 1) return '🥈';
-  if (index === 2) return '🥉';
+function rankBadge(index: number, hasScores = true) {
+  if (!hasScores) return '—';
+  if (index === 0) return '🥇 1º';
+  if (index === 1) return '🥈 2º';
+  if (index === 2) return '🥉 3º';
   return `${index + 1}º`;
 }
 
@@ -335,32 +362,37 @@ function Podium({
 }: {
   rows: ReturnType<typeof getDelegateStats>;
 }) {
+  const scoredRows = rows.filter((r) => r.hasScores || r.scoresCount > 0);
   const podiumOrder = [1, 0, 2];
-  const heights = [95, 135, 75];
+  const heights = [105, 145, 85];
 
-  if (!rows.length) {
+  if (!scoredRows.length) {
     return (
-      <div style={{ ...styles.card, textAlign: 'center' }}>
-        Ainda não há notas para montar o pódio.
+      <div style={{ ...styles.card, padding: 24, textAlign: 'center' }}>
+        <div style={{ fontSize: 32, marginBottom: 8 }}>🏆</div>
+        <h3 style={{ margin: '0 0 6px' }}>Pódio ao vivo da simulação</h3>
+        <p style={{ ...styles.muted, margin: 0, fontSize: 13 }}>
+          O pódio será gerado em tempo real assim que a Mesa Diretora registrar as primeiras avaliações.
+        </p>
       </div>
     );
   }
 
   return (
     <div style={{ ...styles.card, padding: 24 }}>
-      <h3 style={{ textAlign: 'center', marginTop: 0 }}>🏆 Pódio do momento</h3>
+      <h3 style={{ textAlign: 'center', marginTop: 0 }}>🏆 Pódio dos Líderes</h3>
       <div
         style={{
           display: 'flex',
           alignItems: 'end',
           justifyContent: 'center',
-          gap: 10,
+          gap: 12,
           minHeight: 220,
         }}
       >
         {podiumOrder.map((rank, position) => {
-          const d = rows[rank];
-          if (!d) return <div key={position} style={{ flex: 1 }} />;
+          const d = scoredRows[rank];
+          if (!d) return <div key={position} style={{ flex: 1, maxWidth: 180 }} />;
           const height = heights[position];
 
           return (
@@ -373,12 +405,15 @@ function Podium({
                 minWidth: 0,
               }}
             >
-              <div style={{ fontSize: 25 }}>{rankBadge(rank)}</div>
-              <strong style={{ display: 'block', overflowWrap: 'anywhere' }}>
+              <div style={{ fontSize: 26, marginBottom: 4 }}>{rankBadge(rank)}</div>
+              <strong style={{ display: 'block', overflowWrap: 'anywhere', fontSize: 14 }}>
                 {d.name}
               </strong>
-              <div style={{ color: '#c4b5fd', margin: '5px 0 10px' }}>
-                {fmt(d.average)}
+              <div style={{ fontSize: 11, color: teamColor(d.team), fontWeight: 700 }}>
+                {d.team === 'EUA' ? '🇺🇸 EUA' : '🇮🇷 IRÃ'}
+              </div>
+              <div style={{ color: '#c4b5fd', margin: '4px 0 10px', fontWeight: 800 }}>
+                Média {fmt(d.average)}
               </div>
               <div
                 style={{
@@ -386,15 +421,17 @@ function Podium({
                   borderRadius: '12px 12px 0 0',
                   background:
                     rank === 0
-                      ? 'linear-gradient(#a78bfa,#6d28d9)'
+                      ? 'linear-gradient(180deg, #fbbf24 0%, #b45309 100%)'
                       : rank === 1
-                        ? 'linear-gradient(#94a3b8,#475569)'
-                        : 'linear-gradient(#fdba74,#c2410c)',
+                      ? 'linear-gradient(180deg, #cbd5e1 0%, #475569 100%)'
+                      : 'linear-gradient(180deg, #fdba74 0%, #c2410c 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 26,
                   fontWeight: 800,
+                  color: '#fff',
+                  boxShadow: rank === 0 ? '0 0 25px rgba(251, 191, 36, 0.3)' : 'none',
                 }}
               >
                 {rank + 1}
@@ -416,9 +453,32 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
 
   const [page, setPage] = useState<Page>('overview');
-  const [publicMode, setPublicMode] = useState(
-    typeof window !== 'undefined' && window.location.pathname === '/publico',
-  );
+  const [publicMode, setPublicMode] = useState(isPublicPath);
+  const [publicFilterTeam, setPublicFilterTeam] = useState<'ALL' | 'EUA' | 'IRÃ'>('ALL');
+  const [publicFilterSession, setPublicFilterSession] = useState<'all' | number>('all');
+  const [publicFilterMoment, setPublicFilterMoment] = useState<'all' | number>('all');
+  const [publicSearch, setPublicSearch] = useState('');
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
+  const goToPublic = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    try {
+      window.history.pushState(null, '', '/publico');
+    } catch {
+      window.location.hash = '#/publico';
+    }
+    setPublicMode(true);
+  };
+
+  const goToPrivate = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    try {
+      window.history.pushState(null, '', '/');
+    } catch {
+      window.location.hash = '';
+    }
+    setPublicMode(false);
+  };
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -515,7 +575,50 @@ export default function App() {
         );
 
         if (publicError) throw publicError;
-        setData((publicData as PublicData) || EMPTY_DATA);
+
+        const rawData = (publicData as any) || {};
+        const rawDelegates = Array.isArray(rawData.delegates) ? (rawData.delegates as Delegate[]) : [];
+        const rawSessions = Array.isArray(rawData.sessions) ? (rawData.sessions as Session[]) : [];
+        const rawCriteria = Array.isArray(rawData.criteria) ? (rawData.criteria as Criterion[]) : [];
+        const rawEvaluations = Array.isArray(rawData.evaluations) ? rawData.evaluations : [];
+
+        const normalizedEvaluations: Evaluation[] = rawEvaluations.map((e: any) => {
+          let scores: Record<string, number> = {};
+
+          if (e.scores && typeof e.scores === 'object' && !Array.isArray(e.scores)) {
+            scores = e.scores;
+          } else if (Array.isArray(e.evaluation_scores)) {
+            for (const item of e.evaluation_scores) {
+              if (item && item.criterion_id) {
+                scores[item.criterion_id] = Number(item.score);
+              }
+            }
+          } else if (Array.isArray(e.scores)) {
+            for (const item of e.scores) {
+              if (item && item.criterion_id) {
+                scores[item.criterion_id] = Number(item.score);
+              }
+            }
+          }
+
+          return {
+            id: String(e.id || ''),
+            delegate_id: String(e.delegate_id || ''),
+            session_id: Number(e.session_id || 1),
+            moment: Number(e.moment || 1),
+            notes: typeof e.notes === 'string' ? e.notes : '',
+            created_by: e.created_by,
+            scores,
+          };
+        });
+
+        setData({
+          delegates: rawDelegates,
+          sessions: rawSessions,
+          criteria: rawCriteria,
+          evaluations: normalizedEvaluations,
+        });
+        setLastUpdated(new Date());
       } else {
         const [
           delegatesResult,
@@ -558,6 +661,7 @@ export default function App() {
             scores: scoreMap[e.id] || {},
           })) as Evaluation[],
         });
+        setLastUpdated(new Date());
       }
     } catch (err: any) {
       setError(err?.message || 'Não foi possível carregar os dados.');
@@ -567,9 +671,48 @@ export default function App() {
   }, [publicMode]);
 
   useEffect(() => {
-    const pathname = window.location.pathname;
-    setPublicMode(pathname === '/publico');
+    const handleLocationChange = () => {
+      setPublicMode(isPublicPath());
+    };
+    handleLocationChange();
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
   }, []);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('simonu-realtime-public-dashboard')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'evaluations' },
+        () => {
+          void load();
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'evaluation_scores' },
+        () => {
+          void load();
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'delegates' },
+        () => {
+          void load();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [load]);
 
   useEffect(() => {
     let mounted = true;
@@ -963,78 +1106,224 @@ export default function App() {
     };
   });
 
+  // Rankings e métricas específicas para o painel público em tempo real
+  const publicRankingAll = useMemo(() => {
+    const sId = publicFilterSession === 'all' ? undefined : Number(publicFilterSession);
+    const mId = publicFilterMoment === 'all' ? undefined : Number(publicFilterMoment);
+    const stats = getDelegateStats(
+      activeDelegates,
+      data.evaluations,
+      activeCriteria,
+      sId,
+      mId,
+      true, // garante que todos os delegados apareçam e a tela nunca fique vazia
+    );
+
+    return stats.filter((d) => {
+      const matchTeam = publicFilterTeam === 'ALL' || d.team === publicFilterTeam;
+      const q = publicSearch.trim().toLowerCase();
+      const matchSearch =
+        !q ||
+        d.name.toLowerCase().includes(q) ||
+        d.role_title.toLowerCase().includes(q) ||
+        d.team.toLowerCase().includes(q);
+      return matchTeam && matchSearch;
+    });
+  }, [
+    activeDelegates,
+    data.evaluations,
+    activeCriteria,
+    publicFilterSession,
+    publicFilterMoment,
+    publicFilterTeam,
+    publicSearch,
+  ]);
+
+  const publicPodiumRows = useMemo(() => {
+    const sId = publicFilterSession === 'all' ? undefined : Number(publicFilterSession);
+    const mId = publicFilterMoment === 'all' ? undefined : Number(publicFilterMoment);
+    return getDelegateStats(
+      activeDelegates,
+      data.evaluations,
+      activeCriteria,
+      sId,
+      mId,
+      false,
+    );
+  }, [
+    activeDelegates,
+    data.evaluations,
+    activeCriteria,
+    publicFilterSession,
+    publicFilterMoment,
+  ]);
+
+  const scoredCount = useMemo(
+    () => activeDelegates.filter((d) => data.evaluations.some((e) => e.delegate_id === d.id)).length,
+    [activeDelegates, data.evaluations],
+  );
+
+  const euaDelegates = useMemo(() => activeDelegates.filter((d) => d.team === 'EUA'), [activeDelegates]);
+  const iraDelegates = useMemo(() => activeDelegates.filter((d) => d.team === 'IRÃ'), [activeDelegates]);
+  const publicLeader = publicPodiumRows[0] || null;
+
   if (publicMode) {
     return (
       <main style={styles.app}>
         <header
           style={{
-            padding: '25px 5%',
+            padding: '20px 4%',
             borderBottom: '1px solid #29344b',
+            background: 'linear-gradient(180deg, #10182b 0%, #0b1020 100%)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             flexWrap: 'wrap',
-            gap: 12,
+            gap: 16,
           }}
         >
-          <div>
-            <div style={{ color: '#a5b4cc', fontSize: 12, letterSpacing: 2 }}>
-              SIMONU · TEATRO DE OPERAÇÕES
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 12,
+                background: 'linear-gradient(135deg, #3b82f6, #06b6d4)',
+                display: 'grid',
+                placeItems: 'center',
+                boxShadow: '0 8px 20px rgba(59, 130, 246, 0.3)',
+              }}
+            >
+              <Trophy size={24} color="#fff" />
             </div>
-            <h1 style={{ margin: '8px 0' }}>Painel público ao vivo</h1>
-            <p style={{ ...styles.muted, margin: 0 }}>
-              Acompanhe a classificação e o desempenho das delegações.
-            </p>
+            <div>
+              <div
+                style={{
+                  color: '#38bdf8',
+                  fontSize: 11,
+                  letterSpacing: 2,
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                }}
+              >
+                SIMONU · TEATRO DE OPERAÇÕES 2027
+              </div>
+              <h1 style={{ margin: '3px 0 2px', fontSize: 24, fontWeight: 800 }}>
+                Painel Público de Classificação
+              </h1>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#86efac',
+                    background: '#052e1699',
+                    border: '1px solid #166534',
+                    padding: '3px 9px',
+                    borderRadius: 20,
+                  }}
+                >
+                  <span className="live-dot" />
+                  AO VIVO · TEMPO REAL
+                </span>
+                <span style={{ ...styles.muted, fontSize: 12 }}>
+                  Última sincronização: {lastUpdated.toLocaleTimeString('pt-BR')}
+                </span>
+              </div>
+            </div>
           </div>
-          <button style={styles.button} onClick={() => void load()}>
-            <RefreshCw size={16} /> Atualizar
-          </button>
+
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              style={{ ...styles.button, background: '#1e293b' }}
+              onClick={() => void load()}
+              title="Recarregar dados agora"
+            >
+              <RefreshCw size={15} className={loading ? 'spin' : ''} />
+              Atualizar
+            </button>
+            <button
+              style={{
+                ...styles.button,
+                background: 'linear-gradient(135deg, #312e81, #1e1b4b)',
+                borderColor: '#4338ca',
+                color: '#c7d2fe',
+              }}
+              onClick={goToPrivate}
+              title="Acessar o centro de comando da Mesa Diretora"
+            >
+              <Shield size={15} />
+              Acesso Mesa Diretora
+            </button>
+          </div>
         </header>
 
-        <div style={{ padding: '25px 5%', display: 'grid', gap: 20 }}>
+        <div style={{ padding: '24px 4%', display: 'grid', gap: 20 }}>
           {error && (
-            <div style={{ ...styles.card, borderColor: '#f87171', color: '#fca5a5' }}>
+            <div
+              style={{
+                ...styles.card,
+                borderColor: '#7f1d1d',
+                background: '#450a0a55',
+                color: '#fca5a5',
+              }}
+            >
               {error}
             </div>
           )}
 
           {loading && !data.delegates.length ? (
-            <p style={styles.muted}>Carregando os resultados...</p>
+            <div style={{ ...styles.card, textAlign: 'center', padding: 40 }}>
+              <RefreshCw size={32} className="spin" style={{ color: '#60a5fa', margin: '0 auto 12px' }} />
+              <p style={{ ...styles.muted, margin: 0 }}>Carregando dados da simulação em tempo real...</p>
+            </div>
           ) : (
             <>
+              {/* Cards de Métricas Principais */}
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))',
-                  gap: 15,
+                  gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))',
+                  gap: 14,
                 }}
               >
                 <StatCard
-                  label="Delegados com notas"
-                  value={overallRanking.length}
-                  detail={`de ${activeDelegates.length} delegados ativos`}
+                  label="Delegados Ativos"
+                  value={activeDelegates.length}
+                  detail={`${euaDelegates.length} EUA · ${iraDelegates.length} IRÃ`}
                   icon={<Users />}
                 />
                 <StatCard
-                  label="Avaliações registradas"
-                  value={data.evaluations.length}
-                  detail="Registros no sistema"
+                  label="Delegados Ranqueados"
+                  value={scoredCount}
+                  detail={`de ${activeDelegates.length} participantes`}
                   icon={<ClipboardCheck />}
                 />
                 <StatCard
-                  label="Líder geral"
-                  value={overallRanking[0]?.name || '—'}
+                  label="Avaliações Registradas"
+                  value={data.evaluations.length}
+                  detail="Registros da Mesa Diretora"
+                  icon={<Activity />}
+                />
+                <StatCard
+                  label="Líder Geral"
+                  value={publicLeader ? publicLeader.name : '—'}
                   detail={
-                    overallRanking[0]
-                      ? `Média ${fmt(overallRanking[0].average)} / 10`
+                    publicLeader
+                      ? `${publicLeader.team} · Média ${fmt(publicLeader.average)} / 10`
                       : 'Aguardando avaliações'
                   }
                   icon={<Crown />}
                 />
               </div>
 
-              <Podium rows={overallRanking} />
+              {/* Pódio dos Líderes */}
+              <Podium rows={publicPodiumRows} />
 
+              {/* Top 3 Destaques */}
               <div
                 style={{
                   display: 'grid',
@@ -1042,61 +1331,357 @@ export default function App() {
                   gap: 18,
                 }}
               >
-                <TopThree title="🥇 Top 3 geral" rows={overallRanking} />
+                <TopThree title="🥇 Top 3 Geral" rows={overallRanking} />
                 <TopThree
-                  title={`🔥 Top 3 da sessão ${filterSession}`}
+                  title={`🔥 Top 3 da Sessão ${filterSession}`}
                   rows={sessionRanking}
                 />
                 <TopThree
-                  title={`⚡ Top 3 do momento ${filterMoment}`}
+                  title={`⚡ Top 3 do Momento ${filterMoment}`}
                   rows={currentMomentRanking}
                 />
               </div>
 
-              <section style={styles.card}>
-                <h3 style={{ marginTop: 0 }}>Filtros do ranking</h3>
+              {/* Seção de Filtros e Busca */}
+              <section
+                style={{
+                  ...styles.card,
+                  background: '#131b2e',
+                  border: '1px solid #23314d',
+                  display: 'grid',
+                  gap: 16,
+                }}
+              >
                 <div
                   style={{
                     display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
                     flexWrap: 'wrap',
                     gap: 12,
                   }}
                 >
-                  <label>
-                    <span style={{ ...styles.muted, display: 'block', marginBottom: 6 }}>
+                  <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <BarChart3 size={18} color="#60a5fa" />
+                    Rankings e Classificação ao Vivo
+                  </h3>
+                  <span style={{ ...styles.muted, fontSize: 12 }}>
+                    Mostrando <strong>{publicRankingAll.length}</strong> de {activeDelegates.length} delegados
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: 12,
+                  }}
+                >
+                  {/* Filtro de Delegação */}
+                  <div>
+                    <label style={{ ...styles.muted, fontSize: 12, display: 'block', marginBottom: 6 }}>
+                      Delegação
+                    </label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {(['ALL', 'EUA', 'IRÃ'] as const).map((team) => (
+                        <button
+                          key={team}
+                          type="button"
+                          onClick={() => setPublicFilterTeam(team)}
+                          style={{
+                            ...styles.button,
+                            flex: 1,
+                            padding: '8px 10px',
+                            fontSize: 12,
+                            fontWeight: publicFilterTeam === team ? 800 : 500,
+                            background:
+                              publicFilterTeam === team
+                                ? team === 'EUA'
+                                  ? '#1e3a8a'
+                                  : team === 'IRÃ'
+                                  ? '#831843'
+                                  : '#4338ca'
+                                : '#1a2234',
+                            borderColor:
+                              publicFilterTeam === team
+                                ? team === 'EUA'
+                                  ? '#3b82f6'
+                                  : team === 'IRÃ'
+                                  ? '#ec4899'
+                                  : '#6366f1'
+                                : '#2d3b55',
+                          }}
+                        >
+                          {team === 'ALL' ? 'Todas' : team === 'EUA' ? '🇺🇸 EUA' : '🇮🇷 IRÃ'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Filtro de Sessão */}
+                  <div>
+                    <label style={{ ...styles.muted, fontSize: 12, display: 'block', marginBottom: 6 }}>
                       Sessão
-                    </span>
+                    </label>
                     <select
                       style={styles.input}
-                      value={filterSession}
-                      onChange={(e) => setFilterSession(Number(e.target.value))}
+                      value={publicFilterSession}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPublicFilterSession(val === 'all' ? 'all' : Number(val));
+                      }}
                     >
+                      <option value="all">Todas as sessões (Geral)</option>
                       {data.sessions.map((s) => (
                         <option key={s.id} value={s.id}>
                           {s.title || `Sessão ${s.id}`}
                         </option>
                       ))}
                     </select>
-                  </label>
-                  <label>
-                    <span style={{ ...styles.muted, display: 'block', marginBottom: 6 }}>
-                      Momento
-                    </span>
+                  </div>
+
+                  {/* Filtro de Momento */}
+                  <div>
+                    <label style={{ ...styles.muted, fontSize: 12, display: 'block', marginBottom: 6 }}>
+                      Momento da Sessão
+                    </label>
                     <select
                       style={styles.input}
-                      value={filterMoment}
-                      onChange={(e) => setFilterMoment(Number(e.target.value))}
+                      value={publicFilterMoment}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPublicFilterMoment(val === 'all' ? 'all' : Number(val));
+                      }}
                     >
+                      <option value="all">Todos os momentos</option>
                       {MOMENTS.map((m) => (
                         <option key={m.value} value={m.value}>
                           {m.label}
                         </option>
                       ))}
                     </select>
-                  </label>
+                  </div>
+
+                  {/* Campo de Busca */}
+                  <div>
+                    <label style={{ ...styles.muted, fontSize: 12, display: 'block', marginBottom: 6 }}>
+                      Buscar delegado
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        style={{ ...styles.input, paddingRight: 32 }}
+                        placeholder="Nome, cargo ou país..."
+                        value={publicSearch}
+                        onChange={(e) => setPublicSearch(e.target.value)}
+                      />
+                      {publicSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setPublicSearch('')}
+                          style={{
+                            position: 'absolute',
+                            right: 8,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#94a3b8',
+                            cursor: 'pointer',
+                            padding: 4,
+                          }}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </section>
 
+              {/* Tabela de Classificação dos Delegados */}
+              <section style={styles.card}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ color: '#94a3b8', textAlign: 'left', borderBottom: '2px solid #29344b' }}>
+                        <th style={{ padding: '12px 14px', width: 90 }}>Posição</th>
+                        <th style={{ padding: '12px 14px' }}>Delegado</th>
+                        <th style={{ padding: '12px 14px' }}>Representação</th>
+                        <th style={{ padding: '12px 14px', width: 110 }}>Delegação</th>
+                        <th style={{ padding: '12px 14px', width: 120 }}>Avaliações</th>
+                        <th style={{ padding: '12px 14px', width: 180 }}>Média / Desempenho</th>
+                        <th style={{ padding: '12px 14px', width: 130 }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {publicRankingAll.map((d) => {
+                        const isRanked = d.hasScores;
+                        const rankIdx = publicPodiumRows.findIndex((p) => p.id === d.id);
+                        const rankLabel = isRanked && rankIdx >= 0 ? rankBadge(rankIdx) : '—';
+                        const isTop1 = isRanked && rankIdx === 0;
+                        const isTop2 = isRanked && rankIdx === 1;
+                        const isTop3 = isRanked && rankIdx === 2;
+
+                        return (
+                          <tr
+                            key={d.id}
+                            style={{
+                              borderTop: '1px solid #1f293d',
+                              background: isTop1
+                                ? 'rgba(234, 179, 8, 0.05)'
+                                : isTop2
+                                ? 'rgba(148, 163, 184, 0.04)'
+                                : isTop3
+                                ? 'rgba(249, 115, 22, 0.04)'
+                                : 'transparent',
+                              transition: 'background 0.2s',
+                            }}
+                          >
+                            <td style={{ padding: '14px', fontWeight: 800, fontSize: 15 }}>
+                              {rankLabel}
+                            </td>
+                            <td style={{ padding: '14px' }}>
+                              <strong style={{ display: 'block', fontSize: 14 }}>
+                                {d.name}
+                              </strong>
+                            </td>
+                            <td style={{ padding: '14px', color: '#cbd5e1', fontSize: 13 }}>
+                              {d.role_title}
+                            </td>
+                            <td style={{ padding: '14px' }}>
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  padding: '3px 8px',
+                                  borderRadius: 6,
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  background: d.team === 'EUA' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                  color: d.team === 'EUA' ? '#93c5fd' : '#fca5a5',
+                                  border: `1px solid ${d.team === 'EUA' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+                                }}
+                              >
+                                {d.team === 'EUA' ? '🇺🇸 EUA' : '🇮🇷 IRÃ'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '14px', color: '#94a3b8', fontSize: 12 }}>
+                              {d.evaluationsCount} {d.evaluationsCount === 1 ? 'nota' : 'notas'}
+                            </td>
+                            <td style={{ padding: '14px' }}>
+                              {isRanked ? (
+                                <div>
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                      marginBottom: 4,
+                                    }}
+                                  >
+                                    <span style={{ fontWeight: 800, fontSize: 14, color: '#f8fafc' }}>
+                                      {fmt(d.average)}
+                                    </span>
+                                    <span style={{ fontSize: 11, color: '#64748b' }}>/ 10</span>
+                                  </div>
+                                  <div
+                                    style={{
+                                      height: 6,
+                                      borderRadius: 4,
+                                      background: '#0b1020',
+                                      overflow: 'hidden',
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        height: '100%',
+                                        width: `${Math.max(0, Math.min(100, (d.average / 10) * 100))}%`,
+                                        background:
+                                          d.average >= 8
+                                            ? 'linear-gradient(90deg, #10b981, #34d399)'
+                                            : d.average >= 6
+                                            ? 'linear-gradient(90deg, #3b82f6, #60a5fa)'
+                                            : 'linear-gradient(90deg, #f59e0b, #fbbf24)',
+                                        borderRadius: 4,
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              ) : (
+                                <span style={{ color: '#64748b', fontSize: 12, fontStyle: 'italic' }}>
+                                  Aguardando avaliação
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: '14px' }}>
+                              {isTop1 ? (
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    color: '#fde047',
+                                    background: 'rgba(234, 179, 8, 0.15)',
+                                    padding: '3px 8px',
+                                    borderRadius: 6,
+                                    border: '1px solid rgba(234, 179, 8, 0.4)',
+                                  }}
+                                >
+                                  Líder Geral
+                                </span>
+                              ) : isTop2 || isTop3 ? (
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    color: '#a5b4fc',
+                                    background: 'rgba(99, 102, 241, 0.15)',
+                                    padding: '3px 8px',
+                                    borderRadius: 6,
+                                    border: '1px solid rgba(99, 102, 241, 0.4)',
+                                  }}
+                                >
+                                  Pódio
+                                </span>
+                              ) : isRanked ? (
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    color: '#38bdf8',
+                                    background: 'rgba(56, 189, 248, 0.1)',
+                                    padding: '3px 8px',
+                                    borderRadius: 6,
+                                  }}
+                                >
+                                  Avaliado
+                                </span>
+                              ) : (
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    color: '#64748b',
+                                    background: 'rgba(100, 116, 139, 0.1)',
+                                    padding: '3px 8px',
+                                    borderRadius: 6,
+                                  }}
+                                >
+                                  Pendente
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+
+                  {publicRankingAll.length === 0 && (
+                    <div style={{ padding: '30px 20px', textAlign: 'center', color: '#94a3b8' }}>
+                      Nenhum delegado encontrado com os filtros selecionados.
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Gráficos Comparativos */}
               <div
                 style={{
                   display: 'grid',
@@ -1104,46 +1689,28 @@ export default function App() {
                   gap: 18,
                 }}
               >
-                <BarChart title="Média por sessão" rows={sessionChart} />
-                <BarChart title="Comparação entre delegações" rows={teamChart} />
+                <BarChart title="Média de Desempenho por Sessão" rows={sessionChart} />
+                <BarChart title="Comparação Entre Delegações (EUA vs IRÃ)" rows={teamChart} />
               </div>
 
-              <section style={styles.card}>
-                <h3 style={{ marginTop: 0 }}>Classificação geral</h3>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ color: '#a5b4cc', textAlign: 'left' }}>
-                        <th style={{ padding: 10 }}>Posição</th>
-                        <th style={{ padding: 10 }}>Delegado</th>
-                        <th style={{ padding: 10 }}>Representação</th>
-                        <th style={{ padding: 10 }}>Delegação</th>
-                        <th style={{ padding: 10 }}>Média</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {overallRanking.map((d, i) => (
-                        <tr key={d.id} style={{ borderTop: '1px solid #29344b' }}>
-                          <td style={{ padding: 10 }}>{rankBadge(i)}</td>
-                          <td style={{ padding: 10 }}>{d.name}</td>
-                          <td style={{ padding: 10 }}>{d.role_title}</td>
-                          <td style={{ padding: 10, color: teamColor(d.team) }}>
-                            {d.team}
-                          </td>
-                          <td style={{ padding: 10, fontWeight: 800 }}>
-                            {fmt(d.average)} / 10
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-
-              <p style={{ ...styles.muted, fontSize: 12, textAlign: 'center' }}>
-                Atualização automática a cada 5 segundos · Resultados sujeitos às
-                avaliações registradas pela Mesa Diretora.
-              </p>
+              {/* Rodapé Informativo */}
+              <footer
+                style={{
+                  ...styles.muted,
+                  fontSize: 12,
+                  textAlign: 'center',
+                  padding: '20px 0 10px',
+                  borderTop: '1px solid #1e293b',
+                  marginTop: 10,
+                }}
+              >
+                <p style={{ margin: '0 0 6px', fontWeight: 600 }}>
+                  SIMONU 2027 · Sistema Oficial de Avaliação e Rankings em Tempo Real
+                </p>
+                <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>
+                  Dados sincronizados via Supabase Realtime e atualizados a cada 5 segundos · Notas registradas exclusivamente pela Mesa Diretora.
+                </p>
+              </footer>
             </>
           )}
         </div>
@@ -1292,7 +1859,7 @@ export default function App() {
                 <button className="auth-secondary" type="button" onClick={() => { setResetEmail(email); setError(''); setMessage(''); }}>Esqueci minha senha</button>
               </form>
             )}
-            <a className="auth-public" href="/publico"><Eye size={15} /> Abrir painel público ao vivo</a>
+            <a className="auth-public" href="/publico" onClick={goToPublic}><Eye size={15} /> Abrir painel público ao vivo</a>
           </div>
         </section>
       </main>
@@ -1326,7 +1893,7 @@ export default function App() {
           <div style={{ ...styles.muted, fontSize: 12 }}>{user.email}</div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <a href="/publico" style={{ ...styles.button, textDecoration: 'none' }}>
+          <a href="/publico" onClick={goToPublic} style={{ ...styles.button, textDecoration: 'none' }}>
             <Eye size={16} /> Painel público
           </a>
           <button style={styles.button} onClick={() => void load()}>
