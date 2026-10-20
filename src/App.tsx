@@ -5,6 +5,7 @@ import {
   BarChart3,
   CheckCircle2,
   ClipboardCheck,
+  Clock,
   Crown,
   Eye,
   History,
@@ -359,8 +360,10 @@ function BarChart({
 
 function Podium({
   rows,
+  title,
 }: {
   rows: ReturnType<typeof getDelegateStats>;
+  title?: string;
 }) {
   const scoredRows = rows.filter((r) => r.hasScores || r.scoresCount > 0);
   const podiumOrder = [1, 0, 2];
@@ -370,9 +373,9 @@ function Podium({
     return (
       <div style={{ ...styles.card, padding: 24, textAlign: 'center' }}>
         <div style={{ fontSize: 32, marginBottom: 8 }}>🏆</div>
-        <h3 style={{ margin: '0 0 6px' }}>Pódio ao vivo da simulação</h3>
+        <h3 style={{ margin: '0 0 6px' }}>{title || 'Pódio ao vivo da simulação'}</h3>
         <p style={{ ...styles.muted, margin: 0, fontSize: 13 }}>
-          O pódio será gerado em tempo real assim que a Mesa Diretora registrar as primeiras avaliações.
+          Ainda não há avaliações registradas para este filtro (sessão/momento). As notas aparecerão em tempo real assim que a Mesa Diretora salvar as avaliações.
         </p>
       </div>
     );
@@ -380,7 +383,7 @@ function Podium({
 
   return (
     <div style={{ ...styles.card, padding: 24 }}>
-      <h3 style={{ textAlign: 'center', marginTop: 0 }}>🏆 Pódio dos Líderes</h3>
+      <h3 style={{ textAlign: 'center', marginTop: 0 }}>{title || '🏆 Pódio dos Líderes'}</h3>
       <div
         style={{
           display: 'flex',
@@ -1158,6 +1161,88 @@ export default function App() {
     publicFilterMoment,
   ]);
 
+  const activeSessionNum = publicFilterSession === 'all' ? 1 : Number(publicFilterSession);
+  const activeMomentNum = publicFilterMoment === 'all' ? 1 : Number(publicFilterMoment);
+
+  const dynamicSessionRanking = useMemo(
+    () =>
+      getDelegateStats(
+        activeDelegates,
+        data.evaluations,
+        activeCriteria,
+        activeSessionNum,
+        undefined,
+        false,
+      ),
+    [activeDelegates, data.evaluations, activeCriteria, activeSessionNum],
+  );
+
+  const dynamicMomentRanking = useMemo(
+    () =>
+      getDelegateStats(
+        activeDelegates,
+        data.evaluations,
+        activeCriteria,
+        activeSessionNum,
+        activeMomentNum,
+        false,
+      ),
+    [
+      activeDelegates,
+      data.evaluations,
+      activeCriteria,
+      activeSessionNum,
+      activeMomentNum,
+    ],
+  );
+
+  const publicScopeLabel = useMemo(() => {
+    if (publicFilterSession === 'all' && publicFilterMoment === 'all') {
+      return 'Classificação Geral Acumulada';
+    }
+    if (publicFilterSession !== 'all' && publicFilterMoment === 'all') {
+      return `Sessão ${publicFilterSession} (Todos os momentos)`;
+    }
+    return `Sessão ${publicFilterSession} · Momento ${publicFilterMoment} (${MOMENTS.find((m) => m.value === Number(publicFilterMoment))?.label || ''})`;
+  }, [publicFilterSession, publicFilterMoment]);
+
+  const publicPodiumTitle = useMemo(() => {
+    if (publicFilterSession === 'all' && publicFilterMoment === 'all') {
+      return '🏆 Pódio Geral da Simulação';
+    }
+    if (publicFilterSession !== 'all' && publicFilterMoment === 'all') {
+      return `🏆 Pódio da Sessão ${publicFilterSession}`;
+    }
+    return `🏆 Pódio da Sessão ${publicFilterSession} — Momento ${publicFilterMoment} (${MOMENTS.find((m) => m.value === Number(publicFilterMoment))?.label || ''})`;
+  }, [publicFilterSession, publicFilterMoment]);
+
+  const publicTeamChart = useMemo(() => {
+    const sId = publicFilterSession === 'all' ? undefined : Number(publicFilterSession);
+    const mId = publicFilterMoment === 'all' ? undefined : Number(publicFilterMoment);
+    const stats = getDelegateStats(
+      activeDelegates,
+      data.evaluations,
+      activeCriteria,
+      sId,
+      mId,
+      false,
+    );
+    return (['EUA', 'IRÃ'] as Team[]).map((team) => {
+      const members = stats.filter((d) => d.team === team);
+      return {
+        label: team === 'EUA' ? '🇺🇸 Estados Unidos (EUA)' : '🇮🇷 República Islâmica do Irã',
+        value: average(members.map((d) => d.average)),
+        color: teamColor(team),
+      };
+    });
+  }, [
+    activeDelegates,
+    data.evaluations,
+    activeCriteria,
+    publicFilterSession,
+    publicFilterMoment,
+  ]);
+
   const scoredCount = useMemo(
     () => activeDelegates.filter((d) => data.evaluations.some((e) => e.delegate_id === d.id)).length,
     [activeDelegates, data.evaluations],
@@ -1320,8 +1405,146 @@ export default function App() {
                 />
               </div>
 
+              {/* Barra Interativa de Seleção de Sessão e Momento */}
+              <section
+                style={{
+                  ...styles.card,
+                  background: '#101726',
+                  border: '1px solid #1e2c45',
+                  padding: 18,
+                  display: 'grid',
+                  gap: 14,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 10,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Clock size={16} color="#60a5fa" />
+                    <strong style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, color: '#93c5fd' }}>
+                      Seletor de Sessão e Momento da Simulação
+                    </strong>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: '#86efac',
+                      background: '#052e16',
+                      padding: '4px 10px',
+                      borderRadius: 12,
+                      border: '1px solid #166534',
+                    }}
+                  >
+                    ● Visualizando: {publicScopeLabel}
+                  </span>
+                </div>
+
+                {/* Abas Rápidas de Sessão */}
+                <div>
+                  <div style={{ ...styles.muted, fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    1. Escolha a Sessão:
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPublicFilterSession('all');
+                        setPublicFilterMoment('all');
+                      }}
+                      style={{
+                        ...styles.button,
+                        padding: '8px 14px',
+                        fontSize: 12,
+                        fontWeight: publicFilterSession === 'all' ? 800 : 500,
+                        background: publicFilterSession === 'all' ? '#2563eb' : '#172236',
+                        borderColor: publicFilterSession === 'all' ? '#60a5fa' : '#263750',
+                        color: publicFilterSession === 'all' ? '#ffffff' : '#cbd5e1',
+                      }}
+                    >
+                      🌐 Todas as Sessões (Geral)
+                    </button>
+
+                    {data.sessions.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          setPublicFilterSession(s.id);
+                        }}
+                        style={{
+                          ...styles.button,
+                          padding: '8px 14px',
+                          fontSize: 12,
+                          fontWeight: publicFilterSession === s.id ? 800 : 500,
+                          background: publicFilterSession === s.id ? '#2563eb' : '#172236',
+                          borderColor: publicFilterSession === s.id ? '#60a5fa' : '#263750',
+                          color: publicFilterSession === s.id ? '#ffffff' : '#cbd5e1',
+                        }}
+                      >
+                        {s.title || `Sessão ${s.id}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Pills Rápidas de Momento */}
+                <div style={{ paddingTop: 10, borderTop: '1px solid #1a2538' }}>
+                  <div style={{ ...styles.muted, fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    2. Escolha o Momento {publicFilterSession !== 'all' ? `da Sessão ${publicFilterSession}` : '(Geral)'}:
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => setPublicFilterMoment('all')}
+                      style={{
+                        ...styles.button,
+                        padding: '6px 12px',
+                        fontSize: 11,
+                        fontWeight: publicFilterMoment === 'all' ? 800 : 500,
+                        background: publicFilterMoment === 'all' ? '#4f46e5' : '#141c2c',
+                        borderColor: publicFilterMoment === 'all' ? '#818cf8' : '#223048',
+                        color: publicFilterMoment === 'all' ? '#ffffff' : '#94a3b8',
+                      }}
+                    >
+                      {publicFilterSession === 'all' ? 'Média de Todos os Momentos' : `Toda a Sessão ${publicFilterSession}`}
+                    </button>
+
+                    {MOMENTS.map((m) => (
+                      <button
+                        key={m.value}
+                        type="button"
+                        onClick={() => {
+                          if (publicFilterSession === 'all') {
+                            setPublicFilterSession(1);
+                          }
+                          setPublicFilterMoment(m.value);
+                        }}
+                        style={{
+                          ...styles.button,
+                          padding: '6px 12px',
+                          fontSize: 11,
+                          fontWeight: publicFilterMoment === m.value ? 800 : 500,
+                          background: publicFilterMoment === m.value ? '#4f46e5' : '#141c2c',
+                          borderColor: publicFilterMoment === m.value ? '#818cf8' : '#223048',
+                          color: publicFilterMoment === m.value ? '#ffffff' : '#94a3b8',
+                        }}
+                      >
+                        ⏱️ Momento {m.value} ({m.label})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
               {/* Pódio dos Líderes */}
-              <Podium rows={publicPodiumRows} />
+              <Podium rows={publicPodiumRows} title={publicPodiumTitle} />
 
               {/* Top 3 Destaques */}
               <div
@@ -1331,27 +1554,19 @@ export default function App() {
                   gap: 18,
                 }}
               >
-                <TopThree title="🥇 Top 3 Geral" rows={overallRanking} />
+                <TopThree title="🥇 Top 3 Geral (Acumulado)" rows={overallRanking} />
                 <TopThree
-                  title={`🔥 Top 3 da Sessão ${filterSession}`}
-                  rows={sessionRanking}
+                  title={`🔥 Top 3 da Sessão ${activeSessionNum}`}
+                  rows={dynamicSessionRanking}
                 />
                 <TopThree
-                  title={`⚡ Top 3 do Momento ${filterMoment}`}
-                  rows={currentMomentRanking}
+                  title={`⚡ Top 3 da Sessão ${activeSessionNum} · Momento ${activeMomentNum}`}
+                  rows={dynamicMomentRanking}
                 />
               </div>
 
-              {/* Seção de Filtros e Busca */}
-              <section
-                style={{
-                  ...styles.card,
-                  background: '#131b2e',
-                  border: '1px solid #23314d',
-                  display: 'grid',
-                  gap: 16,
-                }}
-              >
+              {/* Tabela de Classificação dos Delegados */}
+              <section style={styles.card}>
                 <div
                   style={{
                     display: 'flex',
@@ -1359,30 +1574,22 @@ export default function App() {
                     alignItems: 'center',
                     flexWrap: 'wrap',
                     gap: 12,
+                    marginBottom: 16,
                   }}
                 >
-                  <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <BarChart3 size={18} color="#60a5fa" />
-                    Rankings e Classificação ao Vivo
-                  </h3>
-                  <span style={{ ...styles.muted, fontSize: 12 }}>
-                    Mostrando <strong>{publicRankingAll.length}</strong> de {activeDelegates.length} delegados
-                  </span>
-                </div>
-
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: 12,
-                  }}
-                >
-                  {/* Filtro de Delegação */}
                   <div>
-                    <label style={{ ...styles.muted, fontSize: 12, display: 'block', marginBottom: 6 }}>
-                      Delegação
-                    </label>
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <h3 style={{ margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <BarChart3 size={18} color="#60a5fa" />
+                      Classificação dos Delegados — {publicScopeLabel}
+                    </h3>
+                    <p style={{ ...styles.muted, margin: 0, fontSize: 12 }}>
+                      As notas e posições abaixo correspondem estritamente ao filtro selecionado.
+                    </p>
+                  </div>
+
+                  {/* Filtro por Delegação e Busca */}
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 4 }}>
                       {(['ALL', 'EUA', 'IRÃ'] as const).map((team) => (
                         <button
                           key={team}
@@ -1390,9 +1597,8 @@ export default function App() {
                           onClick={() => setPublicFilterTeam(team)}
                           style={{
                             ...styles.button,
-                            flex: 1,
-                            padding: '8px 10px',
-                            fontSize: 12,
+                            padding: '6px 10px',
+                            fontSize: 11,
                             fontWeight: publicFilterTeam === team ? 800 : 500,
                             background:
                               publicFilterTeam === team
@@ -1416,61 +1622,11 @@ export default function App() {
                         </button>
                       ))}
                     </div>
-                  </div>
 
-                  {/* Filtro de Sessão */}
-                  <div>
-                    <label style={{ ...styles.muted, fontSize: 12, display: 'block', marginBottom: 6 }}>
-                      Sessão
-                    </label>
-                    <select
-                      style={styles.input}
-                      value={publicFilterSession}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setPublicFilterSession(val === 'all' ? 'all' : Number(val));
-                      }}
-                    >
-                      <option value="all">Todas as sessões (Geral)</option>
-                      {data.sessions.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.title || `Sessão ${s.id}`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Filtro de Momento */}
-                  <div>
-                    <label style={{ ...styles.muted, fontSize: 12, display: 'block', marginBottom: 6 }}>
-                      Momento da Sessão
-                    </label>
-                    <select
-                      style={styles.input}
-                      value={publicFilterMoment}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setPublicFilterMoment(val === 'all' ? 'all' : Number(val));
-                      }}
-                    >
-                      <option value="all">Todos os momentos</option>
-                      {MOMENTS.map((m) => (
-                        <option key={m.value} value={m.value}>
-                          {m.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Campo de Busca */}
-                  <div>
-                    <label style={{ ...styles.muted, fontSize: 12, display: 'block', marginBottom: 6 }}>
-                      Buscar delegado
-                    </label>
                     <div style={{ position: 'relative' }}>
                       <input
-                        style={{ ...styles.input, paddingRight: 32 }}
-                        placeholder="Nome, cargo ou país..."
+                        style={{ ...styles.input, padding: '7px 28px 7px 10px', fontSize: 12, width: 200 }}
+                        placeholder="Buscar delegado..."
                         value={publicSearch}
                         onChange={(e) => setPublicSearch(e.target.value)}
                       />
@@ -1480,14 +1636,14 @@ export default function App() {
                           onClick={() => setPublicSearch('')}
                           style={{
                             position: 'absolute',
-                            right: 8,
+                            right: 6,
                             top: '50%',
                             transform: 'translateY(-50%)',
                             background: 'transparent',
                             border: 'none',
                             color: '#94a3b8',
                             cursor: 'pointer',
-                            padding: 4,
+                            padding: 2,
                           }}
                         >
                           ✕
@@ -1496,10 +1652,7 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-              </section>
 
-              {/* Tabela de Classificação dos Delegados */}
-              <section style={styles.card}>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
@@ -1509,7 +1662,9 @@ export default function App() {
                         <th style={{ padding: '12px 14px' }}>Representação</th>
                         <th style={{ padding: '12px 14px', width: 110 }}>Delegação</th>
                         <th style={{ padding: '12px 14px', width: 120 }}>Avaliações</th>
-                        <th style={{ padding: '12px 14px', width: 180 }}>Média / Desempenho</th>
+                        <th style={{ padding: '12px 14px', width: 200 }}>
+                          Média ({publicFilterMoment !== 'all' ? `Momento ${publicFilterMoment}` : publicFilterSession !== 'all' ? `Sessão ${publicFilterSession}` : 'Geral'})
+                        </th>
                         <th style={{ padding: '12px 14px', width: 130 }}>Status</th>
                       </tr>
                     </thead>
@@ -1690,7 +1845,7 @@ export default function App() {
                 }}
               >
                 <BarChart title="Média de Desempenho por Sessão" rows={sessionChart} />
-                <BarChart title="Comparação Entre Delegações (EUA vs IRÃ)" rows={teamChart} />
+                <BarChart title={`Comparação Entre Delegações — ${publicScopeLabel}`} rows={publicTeamChart} />
               </div>
 
               {/* Rodapé Informativo */}
